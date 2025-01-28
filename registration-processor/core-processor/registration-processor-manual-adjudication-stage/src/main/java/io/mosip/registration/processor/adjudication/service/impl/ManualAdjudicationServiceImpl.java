@@ -4,6 +4,7 @@ import static io.mosip.registration.processor.adjudication.constants.ManualAdjud
 
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -494,13 +495,17 @@ public class ManualAdjudicationServiceImpl implements ManualAdjudicationService 
 
 	@SuppressWarnings("rawtypes")
 	private String CreateDataShareUrl(DataShareRequestDto requestDto, LinkedHashMap<String, Object> policy) throws JsonProcessingException, MalformedURLException, ApisResourceAccessException, DataShareException {
+    // Convert requestDto to JSON string with UTF-8 encoding
 		String req = JsonUtils.javaObjectToJsonString(requestDto);
+    req = new String(req.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
 
+    // Create MultiValueMap for multipart/form-data
 		MultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
 		map.add("name", MANUAL_ADJUDICATION);
 		map.add("filename", MANUAL_ADJUDICATION);
 
-		ByteArrayResource contentsAsResource = new ByteArrayResource(req.getBytes()) {
+    // Create ByteArrayResource with UTF-8 bytes
+    ByteArrayResource contentsAsResource = new ByteArrayResource(req.getBytes(StandardCharsets.UTF_8)) {
 			@Override
 			public String getFilename() {
 				return MANUAL_ADJUDICATION;
@@ -508,6 +513,7 @@ public class ManualAdjudicationServiceImpl implements ManualAdjudicationService 
 		};
 		map.add("file", contentsAsResource);
 
+    // Build the URL
 		List<String> pathSegments = new ArrayList<>();
 		pathSegments.add(policyId);
 		pathSegments.add(subscriberId);
@@ -523,7 +529,11 @@ public class ManualAdjudicationServiceImpl implements ManualAdjudicationService 
 			url = protocol + internalDomainName + env.getProperty(ApiName.DATASHARECREATEURL.name());
 		url = url.replaceAll("[\\[\\]]", "");
 
-		LinkedHashMap response1 = (LinkedHashMap) registrationProcessorRestClientService.postApi(url, MediaType.MULTIPART_FORM_DATA, pathSegments, null, null, map, LinkedHashMap.class);
+    // Send POST request with UTF-8 encoding in Content-Type
+    MediaType mediaType = MediaType.valueOf("multipart/form-data; charset=UTF-8");
+    LinkedHashMap response1 = (LinkedHashMap) registrationProcessorRestClientService.postApi(url, mediaType, pathSegments, null, null, map, LinkedHashMap.class);
+
+    // Handle response
 		if (response1 == null || (response1.get(ERRORS) != null))
 			throw new DataShareException(response1 == null ? "Datashare response is null" : response1.get(ERRORS).toString());
 
