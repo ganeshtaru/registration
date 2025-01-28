@@ -460,12 +460,16 @@ public class ManualAdjudicationServiceImpl implements ManualAdjudicationService 
 
 		ResponseDTO responseDTO=idRepoService.getIdResponseFromIDRepo(id);
 
-		String identityResponse = mapper.writeValueAsString(responseDTO.getIdentity());
+    // Ensure UTF-8 encoding for identity response
+    String identityResponse = new String(mapper.writeValueAsString(responseDTO.getIdentity()).getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
 		Map<String,String> identity=new HashMap<>();
 
 		for(Entry<String,String> entry:demographicMap.entrySet()) {
 			JSONObject identityJson = JsonUtil.objectMapperReadValue(identityResponse, JSONObject.class);
-			identity.put(entry.getValue(),mapper.writeValueAsString(JsonUtil.getJSONValue(identityJson, entry.getValue())));
+        identity.put(entry.getValue(), new String(
+            mapper.writeValueAsString(JsonUtil.getJSONValue(identityJson, entry.getValue())).getBytes(StandardCharsets.UTF_8),
+            StandardCharsets.UTF_8
+        ));
 		}
 		requestDto.setIdentity(identity);
 		List<Documents> documents=responseDTO.getDocuments();
@@ -495,16 +499,15 @@ public class ManualAdjudicationServiceImpl implements ManualAdjudicationService 
 
 	@SuppressWarnings("rawtypes")
 	private String CreateDataShareUrl(DataShareRequestDto requestDto, LinkedHashMap<String, Object> policy) throws JsonProcessingException, MalformedURLException, ApisResourceAccessException, DataShareException {
-    // Convert requestDto to JSON string with UTF-8 encoding
-		String req = JsonUtils.javaObjectToJsonString(requestDto);
-    req = new String(req.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
 
-    // Create MultiValueMap for multipart/form-data
+    // Convert requestDto to JSON string and ensure UTF-8 encoding
+    String req = new String(JsonUtils.javaObjectToJsonString(requestDto).getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
+
 		MultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
 		map.add("name", MANUAL_ADJUDICATION);
 		map.add("filename", MANUAL_ADJUDICATION);
 
-    // Create ByteArrayResource with UTF-8 bytes
+    // Create ByteArrayResource with UTF-8 encoding
     ByteArrayResource contentsAsResource = new ByteArrayResource(req.getBytes(StandardCharsets.UTF_8)) {
 			@Override
 			public String getFilename() {
@@ -513,7 +516,6 @@ public class ManualAdjudicationServiceImpl implements ManualAdjudicationService 
 		};
 		map.add("file", contentsAsResource);
 
-    // Build the URL
 		List<String> pathSegments = new ArrayList<>();
 		pathSegments.add(policyId);
 		pathSegments.add(subscriberId);
@@ -522,20 +524,24 @@ public class ManualAdjudicationServiceImpl implements ManualAdjudicationService 
 
 		if (policy.get(PolicyConstant.DATASHARE_POLICIES) != null) {
 			LinkedHashMap<String, String> datasharePolicies = (LinkedHashMap<String, String>) policies.get(PolicyConstant.DATASHARE_POLICIES);
-			if (!CollectionUtils.isEmpty(datasharePolicies) && datasharePolicies.get(PolicyConstant.SHAREDOMAIN_WRITE) != null)
+        if (!CollectionUtils.isEmpty(datasharePolicies) && datasharePolicies.get(PolicyConstant.SHAREDOMAIN_WRITE) != null) {
 				url = datasharePolicies.get(PolicyConstant.SHAREDOMAIN_WRITE) + env.getProperty(ApiName.DATASHARECREATEURL.name());
 		}
-		if (StringUtils.isEmpty(url))
+    }
+    if (StringUtils.isEmpty(url)) {
 			url = protocol + internalDomainName + env.getProperty(ApiName.DATASHARECREATEURL.name());
+    }
 		url = url.replaceAll("[\\[\\]]", "");
 
-    // Send POST request with UTF-8 encoding in Content-Type
+    // Ensure MediaType includes UTF-8 encoding
     MediaType mediaType = MediaType.valueOf("multipart/form-data; charset=UTF-8");
-    LinkedHashMap response1 = (LinkedHashMap) registrationProcessorRestClientService.postApi(url, mediaType, pathSegments, null, null, map, LinkedHashMap.class);
 
-    // Handle response
-		if (response1 == null || (response1.get(ERRORS) != null))
+    LinkedHashMap response1 = (LinkedHashMap) registrationProcessorRestClientService.postApi(
+            url, mediaType, pathSegments, null, null, map, LinkedHashMap.class);
+
+    if (response1 == null || (response1.get(ERRORS) != null)) {
 			throw new DataShareException(response1 == null ? "Datashare response is null" : response1.get(ERRORS).toString());
+    }
 
 		LinkedHashMap datashare = (LinkedHashMap) response1.get(DATASHARE);
 		return datashare.get(URL) != null ? datashare.get(URL).toString() : null;
