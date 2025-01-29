@@ -501,14 +501,16 @@ public class ManualAdjudicationServiceImpl implements ManualAdjudicationService 
 	private String CreateDataShareUrl(DataShareRequestDto requestDto, LinkedHashMap<String, Object> policy) throws JsonProcessingException, MalformedURLException, ApisResourceAccessException, DataShareException {
 
     // Convert requestDto to JSON string and ensure UTF-8 encoding
-    String req = new String(JsonUtils.javaObjectToJsonString(requestDto).getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
+    String req = JsonUtils.javaObjectToJsonString(requestDto);
+    byte[] utf8Bytes = req.getBytes(StandardCharsets.UTF_8);
+    req = new String(utf8Bytes, StandardCharsets.UTF_8);
 
 		MultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
 		map.add("name", MANUAL_ADJUDICATION);
 		map.add("filename", MANUAL_ADJUDICATION);
 
     // Create ByteArrayResource with UTF-8 encoding
-    ByteArrayResource contentsAsResource = new ByteArrayResource(req.getBytes(StandardCharsets.UTF_8)) {
+    ByteArrayResource contentsAsResource = new ByteArrayResource(utf8Bytes) {
 			@Override
 			public String getFilename() {
 				return MANUAL_ADJUDICATION;
