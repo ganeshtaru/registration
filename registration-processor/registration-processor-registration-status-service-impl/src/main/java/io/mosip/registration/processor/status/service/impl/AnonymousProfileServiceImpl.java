@@ -275,6 +275,12 @@ public class AnonymousProfileServiceImpl implements AnonymousProfileService {
 		List<BiometricInfoDTO> biometrics = new ArrayList<BiometricInfoDTO>();
 		List<ExceptionsDTO> exceptions = new ArrayList<ExceptionsDTO>();
 
+		if (biometricRecord == null || biometricRecord.getSegments() == null) {
+			anonymousProfileDTO.setBiometricInfo(biometrics);
+			anonymousProfileDTO.setExceptions(exceptions);
+			return;
+		}
+
 		List<BIR> birs = biometricRecord.getSegments();
 		for (BIR bir : birs) {
 			HashMap<String, String> othersInfo = bir.getOthers();
