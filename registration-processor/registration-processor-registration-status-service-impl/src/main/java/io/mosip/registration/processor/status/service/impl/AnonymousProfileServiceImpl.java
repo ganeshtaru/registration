@@ -283,6 +283,10 @@ public class AnonymousProfileServiceImpl implements AnonymousProfileService {
 
 		List<BIR> birs = biometricRecord.getSegments();
 		for (BIR bir : birs) {
+			if (bir == null || bir.getBdbInfo() == null) {
+				continue;
+			}
+
 			HashMap<String, String> othersInfo = bir.getOthers();
 
 			if (othersInfo == null) {
@@ -307,16 +311,24 @@ public class AnonymousProfileServiceImpl implements AnonymousProfileService {
 
 			if (exceptionValue) {
 				ExceptionsDTO exceptionsDTO = new ExceptionsDTO();
+				if (bir.getBdbInfo().getType() != null && !bir.getBdbInfo().getType().isEmpty()) {
 				exceptionsDTO.setType(bir.getBdbInfo().getType().get(0).name());
+				}
+				if (bir.getBdbInfo().getSubtype() != null && !bir.getBdbInfo().getSubtype().isEmpty()) {
 				exceptionsDTO.setSubType(String.join(" ", bir.getBdbInfo().getSubtype()));
+				}
 				exceptions.add(exceptionsDTO);
 			} else {
 				BiometricInfoDTO biometricInfoDTO = new BiometricInfoDTO();
+				if (bir.getBdbInfo().getType() != null && !bir.getBdbInfo().getType().isEmpty()) {
 				biometricInfoDTO.setType(bir.getBdbInfo().getType().get(0).name());
-				if (!bir.getBdbInfo().getSubtype().isEmpty()) {
+				}
+				if (bir.getBdbInfo().getSubtype() != null && !bir.getBdbInfo().getSubtype().isEmpty()) {
 					biometricInfoDTO.setSubType(String.join(" ", bir.getBdbInfo().getSubtype()));
 				}
+				if (bir.getBdbInfo().getQuality() != null) {
 				biometricInfoDTO.setQualityScore(bir.getBdbInfo().getQuality().getScore());
+				}
 				biometricInfoDTO.setAttempts(retries);
 				if (digitalID != null) {
 					byte[] digitalIdBytes=null;
