@@ -14,8 +14,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import io.mosip.registration.processor.notification.dto.WhatsAppRequestDTO;
-import io.mosip.registration.processor.notification.dto.WhatsAppResponseDTO;
-import io.mosip.registration.processor.notification.service.WhatsAppNotificationService;
+import io.mosip.registration.processor.notification.service.NotificationRestClient;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.json.JSONArray;
@@ -87,6 +86,9 @@ public class NotificationUtility {
 	@Autowired
 	private RegistrationProcessorRestClientService<Object> restClientService;
 
+    @Autowired
+    private NotificationRestClient notificationRestClient;
+
 	String registrationId = null;
 
 	/** The primary language. */
@@ -120,13 +122,12 @@ public class NotificationUtility {
 	@Autowired
 	private PriorityBasedPacketManagerService packetManagerService;
 
-	@Autowired
-	private WhatsAppNotificationService whatsAppNotificationService;
-
-
 	/** The utility. */
 	@Autowired
 	private Utilities utility;
+
+    @Autowired
+    private ObjectMapper mapper;
 
 	private static final String SMS_SERVICE_ID = "mosip.registration.processor.sms.id";
 	private static final String REG_PROC_APPLICATION_VERSION = "mosip.registration.processor.application.version";
@@ -145,10 +146,6 @@ public class NotificationUtility {
 	private static final String TECHNICAL_ISSUE=NOTIFICATION_TEMPLATE_CODE+"technical.issue.";
 	private static final String SUP_REJECT=NOTIFICATION_TEMPLATE_CODE+"supervisor.reject.";
 
-
-
-	@Autowired
-	private ObjectMapper mapper;
 
 	public void sendNotification(RegistrationAdditionalInfoDTO registrationAdditionalInfoDTO,
 			InternalRegistrationStatusDto registrationStatusDto, SyncRegistrationEntity regEntity,
@@ -198,13 +195,55 @@ public class NotificationUtility {
 				} else if (notificationType.equalsIgnoreCase("SMS") && (registrationAdditionalInfoDTO.getPhone() != null
 						&& !registrationAdditionalInfoDTO.getPhone().isEmpty())) {
 					sendSMSNotification(registrationAdditionalInfoDTO, messageSenderDTO, attributes, description,preferredLanguage);
-				}else if (notificationType.equalsIgnoreCase("WHATSAPP")
-						&& registrationAdditionalInfoDTO.getPhone() != null
-						&& !registrationAdditionalInfoDTO.getPhone().isEmpty()) {
-					sendWhatsAppNotification(registrationAdditionalInfoDTO,	messageSenderDTO,attributes,description,preferredLanguage);
 				}
 			}
 		}
+		}
+	}
+
+	private void sendWhatsAppNotification(
+			RegistrationAdditionalInfoDTO registrationAdditionalInfoDTO,
+			MessageSenderDTO messageSenderDTO,
+			Map<String, Object> attributes,
+			LogDescription description,
+			String preferredLanguage) {
+
+		try {
+			InputStream in = templateGenerator.getTemplate(
+					messageSenderDTO.getSmsTemplateCode(),
+					attributes,
+					preferredLanguage
+			);
+
+			String message = IOUtils.toString(in, ENCODING);
+
+			WhatsAppRequestDTO requestDTO = new WhatsAppRequestDTO();
+			requestDTO.setRecipient(registrationAdditionalInfoDTO.getPhone());
+			requestDTO.setMessage(message);
+
+			notificationRestClient.sendWhatsApp(requestDTO);
+
+			description.setCode(PlatformSuccessMessages.RPR_MESSAGE_SENDER_STAGE_SUCCESS.getCode());
+			description.setMessage("WhatsApp notification sent successfully");
+
+			regProcLogger.info(
+					LoggerFileConstant.SESSIONID.toString(),
+					LoggerFileConstant.REGISTRATIONID.toString(),
+					registrationId,
+					description.getMessage()
+			);
+
+		} catch (Exception e) {
+			description.setCode(PlatformErrorMessages.RPR_MESSAGE_SENDER_SMS_FAILED.getCode());
+			description.setMessage("WhatsApp notification failed");
+
+			regProcLogger.error(
+					LoggerFileConstant.SESSIONID.toString(),
+					LoggerFileConstant.REGISTRATIONID.toString(),
+					registrationId,
+					description.getMessage(),
+					ExceptionUtils.getStackTrace(e)
+			);
 		}
 	}
 
@@ -429,36 +468,12 @@ public class NotificationUtility {
 
 		return responseDto;
 	}
-	private void sendWhatsAppNotification(
-			RegistrationAdditionalInfoDTO registrationAdditionalInfoDTO,
-			MessageSenderDTO messageSenderDTO,
-			Map<String, Object> attributes,
-			LogDescription description,
-			String preferredLanguage) {
-
-		try {
-			WhatsAppRequestDTO requestDTO = new WhatsAppRequestDTO();
-			requestDTO.setRecipient(registrationAdditionalInfoDTO.getPhone());
-			requestDTO.setMessage(messageSenderDTO.getMessageBody());
-
-			WhatsAppResponseDTO response =
-					whatsAppNotificationService.sendWhatsApp(requestDTO);
-
-			regProcLogger.info(
-					LoggerFileConstant.SESSIONID.toString(),
-					LoggerFileConstant.REGISTRATIONID.toString(),
-					registrationId,
-					"WhatsApp sent successfully, messageId=" + response.getMessageId()
-			);
-
-		} catch (Exception e) {
-			regProcLogger.error(
-					LoggerFileConstant.SESSIONID.toString(),
-					LoggerFileConstant.REGISTRATIONID.toString(),
-					"WhatsApp notification failed",
-					ExceptionUtils.getStackTrace(e)
-			);
-		}
+	// Builds WhatsAppRequestDTO, stage does not send directly
+	public WhatsAppRequestDTO buildWhatsAppRequest(String mobileNumber, String message) {
+		WhatsAppRequestDTO requestDTO = new WhatsAppRequestDTO();
+		requestDTO.setRecipient(mobileNumber);
+		requestDTO.setMessage(message);
+		return requestDTO;
 	}
 
 

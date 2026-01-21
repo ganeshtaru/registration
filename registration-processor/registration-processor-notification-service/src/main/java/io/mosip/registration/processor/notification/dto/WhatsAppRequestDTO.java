@@ -1,22 +1,23 @@
 package io.mosip.registration.processor.notification.dto;
 
 public class WhatsAppRequestDTO {
-        public String getRecipient() {
-            return recipient;
-        }
 
-        public void setRecipient(String recipient) {
-            this.recipient = recipient;
-        }
+    private String recipient;
+    private String message;
 
-        public String getMessage() {
-            return message;
-        }
+    public String getRecipient() {
+        return recipient;
+    }
 
-        public void setMessage(String message) {
-            this.message = message;
-        }
+    public void setRecipient(String recipient) {
+        this.recipient = recipient;
+    }
 
-        private String recipient;
-        private String message;
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
 }

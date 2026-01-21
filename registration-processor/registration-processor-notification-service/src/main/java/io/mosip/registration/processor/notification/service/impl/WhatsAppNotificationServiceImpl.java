@@ -1,30 +1,28 @@
 package io.mosip.registration.processor.notification.service.impl;
 
-import io.mosip.registration.processor.notification.dto.WhatsAppRequestDTO;
-import io.mosip.registration.processor.notification.dto.WhatsAppResponseDTO;
-import io.mosip.registration.processor.notification.service.WhatsAppNotificationService;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.jose4j.json.internal.json_simple.JSONObject;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
-@Service
-public class WhatsAppNotificationServiceImpl
-        implements WhatsAppNotificationService {
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
-    @Value("${base-url}")
+import io.mosip.registration.processor.notification.dto.WhatsAppRequestDTO;
+import io.mosip.registration.processor.notification.dto.WhatsAppResponseDTO;
+import io.mosip.registration.processor.notification.service.WhatsAppNotificationService;
+
+@Service
+public class WhatsAppNotificationServiceImpl implements WhatsAppNotificationService {
+
+    @Value("${cit.api-key}")
+    private String apiKey;
+
+    @Value("${cit.whatsapp.base-url}")
     private String baseUrl;
 
-    @Value("${session-id}")
+    @Value("${cit.whatsapp.session-id}")
     private String sessionId;
-
-    @Value("${x-api-key}")
-    private String apiKey;
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
@@ -32,29 +30,28 @@ public class WhatsAppNotificationServiceImpl
     public WhatsAppResponseDTO sendWhatsApp(WhatsAppRequestDTO requestDTO) {
 
         try {
-            String finalUrl = baseUrl.replace(
-                    "{{wa_sessionId}}", sessionId);
+            String url = baseUrl + "/whatsapp/" + sessionId + "/message";
 
-            JSONObject body = new JSONObject();
-            body.put("recipient", requestDTO.getRecipient());
-            body.put("message", requestDTO.getMessage());
+            String payload = String.format(
+                    "{\"recipient\":\"%s\",\"message\":\"%s\"}",
+                    requestDTO.getRecipient(),
+                    requestDTO.getMessage()
+            );
 
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(finalUrl))
+                    .uri(URI.create(url))
                     .header("Content-Type", "application/json")
-                    .header("Accept", "application/json")
                     .header("x-api-key", apiKey)
-                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .POST(HttpRequest.BodyPublishers.ofString(payload))
                     .build();
 
             HttpResponse<String> response =
                     httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-            return new ObjectMapper()
-                    .readValue(response.body(), WhatsAppResponseDTO.class);
+            return new WhatsAppResponseDTO(response.statusCode(), response.body());
 
         } catch (Exception e) {
-            throw new RuntimeException("WhatsApp API call failed", e);
+            return new WhatsAppResponseDTO(500, e.getMessage());
         }
     }
 }
