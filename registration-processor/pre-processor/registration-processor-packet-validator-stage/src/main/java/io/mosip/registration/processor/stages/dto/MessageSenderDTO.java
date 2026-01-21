@@ -14,4 +14,7 @@ public class MessageSenderDTO {
 	/** The subject. */
 	private String subjectTemplateCode = "";
 
+    public String getMessageBody() {
+		return null;
+	}
 }

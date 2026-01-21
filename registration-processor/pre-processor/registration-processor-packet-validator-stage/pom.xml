@@ -107,7 +107,13 @@
 			<artifactId>spring-boot-starter-webflux</artifactId>
 			<version>${spring.boot.version}</version>
 		</dependency>
-	</dependencies>
+        <dependency>
+            <groupId>io.mosip.registrationprocessor</groupId>
+            <artifactId>registration-processor-notification-service</artifactId>
+            <version>1.2.1.2</version>
+            <scope>compile</scope>
+        </dependency>
+    </dependencies>
 	<build>
 		<plugins>
 		</plugins>
