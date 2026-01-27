@@ -13,8 +13,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import io.mosip.registration.processor.notification.dto.WhatsAppRequestDTO;
-import io.mosip.registration.processor.notification.service.NotificationRestClient;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.json.JSONArray;
@@ -86,9 +84,6 @@ public class NotificationUtility {
 	@Autowired
 	private RegistrationProcessorRestClientService<Object> restClientService;
 
-    @Autowired
-    private NotificationRestClient notificationRestClient;
-
 	String registrationId = null;
 
 	/** The primary language. */
@@ -147,6 +142,7 @@ public class NotificationUtility {
 	private static final String SUP_REJECT=NOTIFICATION_TEMPLATE_CODE+"supervisor.reject.";
 
 
+
 	public void sendNotification(RegistrationAdditionalInfoDTO registrationAdditionalInfoDTO,
 			InternalRegistrationStatusDto registrationStatusDto, SyncRegistrationEntity regEntity,
 			String[] allNotificationTypes, boolean isProcessingSuccess,boolean isValidSupervisorStatus)
@@ -195,57 +191,11 @@ public class NotificationUtility {
 				} else if (notificationType.equalsIgnoreCase("SMS") && (registrationAdditionalInfoDTO.getPhone() != null
 						&& !registrationAdditionalInfoDTO.getPhone().isEmpty())) {
 					sendSMSNotification(registrationAdditionalInfoDTO, messageSenderDTO, attributes, description,preferredLanguage);
-				}
 			}
 		}
 		}
 	}
-
-	private void sendWhatsAppNotification(
-			RegistrationAdditionalInfoDTO registrationAdditionalInfoDTO,
-			MessageSenderDTO messageSenderDTO,
-			Map<String, Object> attributes,
-			LogDescription description,
-			String preferredLanguage) {
-
-		try {
-			InputStream in = templateGenerator.getTemplate(
-					messageSenderDTO.getSmsTemplateCode(),
-					attributes,
-					preferredLanguage
-			);
-
-			String message = IOUtils.toString(in, ENCODING);
-
-			WhatsAppRequestDTO requestDTO = new WhatsAppRequestDTO();
-			requestDTO.setRecipient(registrationAdditionalInfoDTO.getPhone());
-			requestDTO.setMessage(message);
-
-			notificationRestClient.sendWhatsApp(requestDTO);
-
-			description.setCode(PlatformSuccessMessages.RPR_MESSAGE_SENDER_STAGE_SUCCESS.getCode());
-			description.setMessage("WhatsApp notification sent successfully");
-
-			regProcLogger.info(
-					LoggerFileConstant.SESSIONID.toString(),
-					LoggerFileConstant.REGISTRATIONID.toString(),
-					registrationId,
-					description.getMessage()
-			);
-
-		} catch (Exception e) {
-			description.setCode(PlatformErrorMessages.RPR_MESSAGE_SENDER_SMS_FAILED.getCode());
-			description.setMessage("WhatsApp notification failed");
-
-			regProcLogger.error(
-					LoggerFileConstant.SESSIONID.toString(),
-					LoggerFileConstant.REGISTRATIONID.toString(),
-					registrationId,
-					description.getMessage(),
-					ExceptionUtils.getStackTrace(e)
-			);
 		}
-	}
 
 	private List<String> getPreferredLanguages(InternalRegistrationStatusDto registrationStatusDto) throws ApisResourceAccessException, 
 	PacketManagerException, JsonProcessingException, IOException, JSONException {
@@ -468,14 +418,6 @@ public class NotificationUtility {
 
 		return responseDto;
 	}
-	// Builds WhatsAppRequestDTO, stage does not send directly
-	public WhatsAppRequestDTO buildWhatsAppRequest(String mobileNumber, String message) {
-		WhatsAppRequestDTO requestDTO = new WhatsAppRequestDTO();
-		requestDTO.setRecipient(mobileNumber);
-		requestDTO.setMessage(message);
-		return requestDTO;
-	}
-
 
 	private NotificationTemplateType setNotificationTemplateType(InternalRegistrationStatusDto registrationStatusDto,
 			NotificationTemplateType type)  {

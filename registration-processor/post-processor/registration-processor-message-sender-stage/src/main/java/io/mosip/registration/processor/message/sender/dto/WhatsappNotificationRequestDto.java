@@ -1,6 +1,6 @@
-package io.mosip.registration.processor.notification.dto;
+package io.mosip.registration.processor.message.sender.dto;
 
-public class WhatsAppRequestDTO {
+public class WhatsappNotificationRequestDto {
 
     private String recipient;
     private String message;

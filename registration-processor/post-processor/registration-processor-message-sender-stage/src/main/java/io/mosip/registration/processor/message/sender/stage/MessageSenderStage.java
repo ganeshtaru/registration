@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import io.mosip.registration.processor.message.sender.dto.WhatsappNotificationRequestDto;
+import io.mosip.registration.processor.message.sender.service.WhatsappNotificationService;
 import org.json.JSONException;
 import org.json.simple.parser.ParseException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -175,7 +177,11 @@ public class MessageSenderStage extends MosipVerticleAPIManager {
 	protected String getPropertyPrefix() {
 		return STAGE_PROPERTY_PREFIX;
 	}
-	
+
+	@Autowired
+	private WhatsappNotificationService whatsappNotificationService;
+
+
 	/**
 	 * Deploy verticle.
 	 */
@@ -407,11 +413,13 @@ public class MessageSenderStage extends MosipVerticleAPIManager {
 	 * @throws Exception
 	 *             the exception
 	 */
+
+
 	private boolean sendNotification(String id, String process, Map<String, Object> attributes, String[] ccEMailList,
 			String[] allNotificationTypes, String regType, MessageSenderDto messageSenderDto,
 			LogDescription description) throws Exception {
 		boolean isNotificationSuccess = false;
-		boolean isSMSSuccess = false, isEmailSuccess = false;
+		boolean isSMSSuccess = false, isEmailSuccess = false, isWhatsappSuccess = false;
 		// if notification is set as none then dont send notification
 		if (allNotificationTypes != null && allNotificationTypes.length == 1
 				&& allNotificationTypes[0].equalsIgnoreCase(NotificationTypeEnum.NONE.name())) {
@@ -430,41 +438,59 @@ public class MessageSenderStage extends MosipVerticleAPIManager {
 				} else if (notificationType.equalsIgnoreCase(NotificationTypeEnum.EMAIL.name())
 						&& isTemplateAvailable(messageSenderDto)) {
 					isEmailSuccess = sendEmail(id, process, attributes, ccEMailList, regType, messageSenderDto, description);
+
+            } else if (notificationType.equalsIgnoreCase(NotificationTypeEnum.WHATSAPP.name())) {
+
+                WhatsappNotificationRequestDto whatsappDto =
+                        new WhatsappNotificationRequestDto();
+
+                // Must include country code
+                whatsappDto.setRecipient(attributes.get("mobile").toString());
+                whatsappDto.setMessage("Hello Developer, this is a test message");
+
+                whatsappNotificationService.sendWhatsappMessage(whatsappDto);
+                isWhatsappSuccess = true;
+
 				} else {
 					throw new TemplateNotFoundException(MessageSenderStatusMessage.TEMPLATE_NOT_FOUND);
 				}
 			}
 		}
 
-		if (isEmailSuccess && isSMSSuccess) {
+    // Final status calculation
+    if ((isEmailSuccess || !contains(allNotificationTypes, NotificationTypeEnum.EMAIL.name()))
+            && (isSMSSuccess || !contains(allNotificationTypes, NotificationTypeEnum.SMS.name()))
+            && (isWhatsappSuccess || !contains(allNotificationTypes, NotificationTypeEnum.WHATSAPP.name()))) {
+
 			isNotificationSuccess = true;
 			description.setMessage(StatusUtil.MESSAGE_SENDER_NOTIF_SUCC.getMessage());
 			description.setCode(PlatformSuccessMessages.RPR_MESSAGE_SENDER_STAGE_SUCCESS.getCode());
 			description.setStatusComment(StatusUtil.MESSAGE_SENDER_NOTIF_SUCC.getMessage());
 			description.setSubStatusCode(StatusUtil.MESSAGE_SENDER_NOTIF_SUCC.getCode());
-		} else if (!isEmailSuccess && !isSMSSuccess) {
+
+    } else {
+        isNotificationSuccess = false;
 			description.setMessage(StatusUtil.MESSAGE_SENDER_NOTIFICATION_FAILED.getMessage());
 			description.setCode(PlatformErrorMessages.RPR_MESSAGE_SENDER_STAGE_FAILED.getCode());
 			description.setStatusComment(StatusUtil.MESSAGE_SENDER_NOTIFICATION_FAILED.getMessage());
-			description.setSubStatusCode(StatusUtil.MESSAGE_SENDER_NOTIFICATION_FAILED.getCode());
-		} else if (allNotificationTypes.length == 1
-				&& ((allNotificationTypes[0].equalsIgnoreCase(NotificationTypeEnum.SMS.name()) && isSMSSuccess)
-						|| (allNotificationTypes[0].equalsIgnoreCase(NotificationTypeEnum.EMAIL.name())
-								&& isEmailSuccess))) {
-			// if only one notification type is set and that is successful
-			isNotificationSuccess = true;
-		} else if (!isEmailSuccess || !isSMSSuccess) {
-			isNotificationSuccess = false;
-			String failedMessage = "Failed to send Notification for type : "
-					+ (isEmailSuccess ? NotificationTypeEnum.SMS.name() : NotificationTypeEnum.EMAIL.name());
-			description.setMessage(failedMessage);
-			description.setCode(PlatformErrorMessages.RPR_MESSAGE_SENDER_STAGE_FAILED.getCode());
-			description.setStatusComment(failedMessage);
 			description.setSubStatusCode(StatusUtil.MESSAGE_SENDER_NOTIFICATION_FAILED.getCode());
 		}
 
 		return isNotificationSuccess;
 	}
+
+	private boolean contains(String[] array, String value) {
+		if (array == null) {
+			return false;
+		}
+		for (String item : array) {
+			if (item != null && item.equalsIgnoreCase(value)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 
 	private boolean sendEmail(String id, String process, Map<String, Object> attributes, String[] ccEMailList, String regType,
 			MessageSenderDto messageSenderDto, LogDescription description) throws Exception {
