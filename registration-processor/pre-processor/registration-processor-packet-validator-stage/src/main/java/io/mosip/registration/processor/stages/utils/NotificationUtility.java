@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import io.mosip.registration.processor.stages.service.WhatsAppNotificationService;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.json.JSONArray;
@@ -22,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -99,6 +101,10 @@ public class NotificationUtility {
 	@Value("#{${registration.processor.notification.additional-process.category-mapping:{:}}}")
 	private Map<String,String> additionalProcessCategoryForNotification;
 
+	@Autowired
+	private WhatsAppNotificationService whatsAppNotificationService;
+
+
 	/** The env. */
 	@Autowired
 	private Environment env;
@@ -106,17 +112,17 @@ public class NotificationUtility {
 	/** The template generator. */
 	@Autowired
 	private TemplateGenerator templateGenerator;
-	
+
 	@Autowired
 	private LanguageUtility languageUtility;
 
 	/** The resclient. */
 	@Autowired
 	private RestApiClient resclient;
-	
+
 	@Autowired
 	private PriorityBasedPacketManagerService packetManagerService;
-	
+
 	/** The utility. */
 	@Autowired
 	private Utilities utility;
@@ -191,13 +197,16 @@ public class NotificationUtility {
 				} else if (notificationType.equalsIgnoreCase("SMS") && (registrationAdditionalInfoDTO.getPhone() != null
 						&& !registrationAdditionalInfoDTO.getPhone().isEmpty())) {
 					sendSMSNotification(registrationAdditionalInfoDTO, messageSenderDTO, attributes, description,preferredLanguage);
+				}else if (notificationType.equalsIgnoreCase("WHATSAPP") && registrationAdditionalInfoDTO.getPhone() != null
+						&& !registrationAdditionalInfoDTO.getPhone().isEmpty()) {
+					sendWhatsAppNotification(registrationAdditionalInfoDTO, messageSenderDTO, attributes, description, preferredLanguage);
 				}
 			}
 		}
 		}
 	}
 
-	private List<String> getPreferredLanguages(InternalRegistrationStatusDto registrationStatusDto) throws ApisResourceAccessException, 
+	private List<String> getPreferredLanguages(InternalRegistrationStatusDto registrationStatusDto) throws ApisResourceAccessException,
 	PacketManagerException, JsonProcessingException, IOException, JSONException {
 		if(userPreferredLanguageAttribute!=null && !userPreferredLanguageAttribute.isBlank()) {
 			try {
@@ -221,7 +230,7 @@ public class NotificationUtility {
 		if(defaultTemplateLanguages!=null && !defaultTemplateLanguages.isBlank()) {
 			return List.of(defaultTemplateLanguages.split(","));
 		}
-		Map<String,String> idValuesMap=packetManagerService.getAllFieldsByMappingJsonKeys(registrationStatusDto.getRegistrationId(), 
+		Map<String,String> idValuesMap=packetManagerService.getAllFieldsByMappingJsonKeys(registrationStatusDto.getRegistrationId(),
 				registrationStatusDto.getRegistrationType(), ProviderStageName.PACKET_VALIDATOR);
 		List<String> idValues=new ArrayList<>();
 		for(Entry<String, String> entry: idValuesMap.entrySet()) {
@@ -234,16 +243,16 @@ public class NotificationUtility {
 			if(idValue!=null&& !idValue.isBlank()  ) {
 				if(isJSONArrayValid(idValue)) {
 					org.json.simple.JSONArray array=mapper.readValue(idValue, org.json.simple.JSONArray.class);
-					for(Object obj:array) {	
+					for(Object obj:array) {
 						org.json.simple.JSONObject json= new org.json.simple.JSONObject((Map) obj);
-						langSet.add( (String) json.get("language"));	
+						langSet.add( (String) json.get("language"));
 					}
 				}
 			}
 		}
 		return new ArrayList<>(langSet);
 	}
-	
+
 	public boolean isJSONArrayValid(String jsonArrayString) {
 	        try {
 	            new JSONArray(jsonArrayString);
@@ -332,7 +341,7 @@ public class NotificationUtility {
 			MessageSenderDTO messageSenderDTO, Map<String, Object> attributes, LogDescription description,String preferedLanguage) {
 		try {
 			String subjectTemplateCode = messageSenderDTO.getSubjectTemplateCode();
-			
+
 			ResponseDto emailResponse = sendEmail(registrationAdditionalInfoDTO,
 					messageSenderDTO.getEmailTemplateCode(), subjectTemplateCode, attributes,preferedLanguage);
 			if (emailResponse.getStatus().equals("success")) {
@@ -418,6 +427,34 @@ public class NotificationUtility {
 
 		return responseDto;
 	}
+	private void sendWhatsAppNotification(
+			RegistrationAdditionalInfoDTO registrationAdditionalInfoDTO,
+			MessageSenderDTO messageSenderDTO,
+			Map<String, Object> attributes,
+			LogDescription description,
+			String preferredLanguage) {
+
+		try {
+			// Format same as your Postman success response
+			String phone = "91" + registrationAdditionalInfoDTO.getPhone() + "@c.us";
+
+			// For now simple text (later you can plug templateGenerator)
+			String message = "Hello Developer, this is a test message";
+
+			ResponseEntity<String> response =
+					whatsAppNotificationService.sendMessage(phone, message);
+
+			if (response.getStatusCode().is2xxSuccessful()) {
+				description.setMessage("WhatsApp notification sent successfully");
+			} else {
+				description.setMessage("WhatsApp notification failed");
+			}
+
+		} catch (Exception e) {
+			regProcLogger.error("WhatsApp notification failed", e);
+		}
+	}
+
 
 	private NotificationTemplateType setNotificationTemplateType(InternalRegistrationStatusDto registrationStatusDto,
 			NotificationTemplateType type)  {
