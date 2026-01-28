@@ -37,11 +37,6 @@ import io.vertx.core.json.JsonObject;
 @ImportAutoConfiguration({RefreshAutoConfiguration.class})
 //This is added to fix issue with loading stage specific properties from bootstrap, expected by the stages config.
 @PropertySource("classpath:bootstrap.properties")
-@ComponentScan(basePackages = {
-		"io.mosip.registration.processor.stages.service",
-		"io.mosip.registration.processor.stages.util",
-		"io.mosip.registration.processor.stages.notification"
-})
 public class StagesConfig {
 	
 	private static final String PROP_STAGE_GROUP_NAME = "stage-group-name";

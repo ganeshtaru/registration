@@ -13,7 +13,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import io.mosip.registration.processor.stages.service.WhatsAppNotificationService;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.json.JSONArray;
@@ -100,10 +99,6 @@ public class NotificationUtility {
 
 	@Value("#{${registration.processor.notification.additional-process.category-mapping:{:}}}")
 	private Map<String,String> additionalProcessCategoryForNotification;
-
-	@Autowired
-	private WhatsAppNotificationService whatsAppNotificationService;
-
 
 	/** The env. */
 	@Autowired
@@ -427,6 +422,7 @@ public class NotificationUtility {
 
 		return responseDto;
 	}
+
 	private void sendWhatsAppNotification(
 			RegistrationAdditionalInfoDTO registrationAdditionalInfoDTO,
 			MessageSenderDTO messageSenderDTO,
@@ -435,25 +431,46 @@ public class NotificationUtility {
 			String preferredLanguage) {
 
 		try {
-			// Format same as your Postman success response
-			String phone = "91" + registrationAdditionalInfoDTO.getPhone() + "@c.us";
+			// Generate message using existing template mechanism
+			InputStream in = templateGenerator.getTemplate(
+					messageSenderDTO.getSmsTemplateCode(),
+					attributes,
+					preferredLanguage
+			);
+			String message = IOUtils.toString(in, ENCODING);
 
-			// For now simple text (later you can plug templateGenerator)
-			String message = "Hello Developer, this is a test message";
+			// Request body as required by WhatsApp Notifier
+			Map<String, Object> request = new HashMap<>();
+			request.put("recipient", registrationAdditionalInfoDTO.getPhone());
+			request.put("message", message);
 
-			ResponseEntity<String> response =
-					whatsAppNotificationService.sendMessage(phone, message);
+			RequestWrapper<Map<String, Object>> requestWrapper = new RequestWrapper<>();
+			requestWrapper.setId("ida");
+			requestWrapper.setVersion("1.0");
+			requestWrapper.setRequesttime(LocalDateTime.now());
+			requestWrapper.setRequest(request);
 
-			if (response.getStatusCode().is2xxSuccessful()) {
-				description.setMessage("WhatsApp notification sent successfully");
-			} else {
-				description.setMessage("WhatsApp notification failed");
-			}
+			String whatsappUrl = env.getProperty("whatsapp-notification.rest.uri");
+
+			resclient.postApi(
+					whatsappUrl,
+					MediaType.APPLICATION_JSON,
+					requestWrapper,
+					ResponseWrapper.class
+			);
+
+			description.setMessage("WhatsApp notification sent successfully");
 
 		} catch (Exception e) {
-			regProcLogger.error("WhatsApp notification failed", e);
+			regProcLogger.error(
+					LoggerFileConstant.REGISTRATIONID.toString(),
+					registrationId,
+					"WhatsApp notification failed",
+					e
+			);
 		}
 	}
+
 
 
 	private NotificationTemplateType setNotificationTemplateType(InternalRegistrationStatusDto registrationStatusDto,
