@@ -450,7 +450,10 @@ public class NotificationUtility {
 			requestWrapper.setRequesttime(LocalDateTime.now());
 			requestWrapper.setRequest(request);
 
-			String whatsappUrl = env.getProperty("whatsapp-notification.rest.uri");
+        String whatsappUrl = env.getProperty("WHATSAPPNOTIFIER");
+        if (whatsappUrl == null || whatsappUrl.isBlank()) {
+            throw new IllegalStateException("WHATSAPPNOTIFIER property is not configured");
+        }
 
 			resclient.postApi(
 					whatsappUrl,
